@@ -13,6 +13,8 @@ import { eq, desc, and, lte, gte } from "drizzle-orm";
 export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: UpsertUser): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
 
   // Pantry
@@ -48,6 +50,16 @@ class DatabaseStorage implements IStorage {
   // Users
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async createUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db.insert(users).values(userData).returning();
     return user;
   }
 
@@ -97,13 +109,7 @@ class DatabaseStorage implements IStorage {
     return db
       .select()
       .from(pantryItems)
-      .where(
-        and(
-          eq(pantryItems.userId, userId),
-          lte(pantryItems.expiresAt, limit),
-          gte(pantryItems.expiresAt, now),
-        ),
-      )
+      .where(and(eq(pantryItems.userId, userId), lte(pantryItems.expiresAt, limit), gte(pantryItems.expiresAt, now)))
       .orderBy(pantryItems.expiresAt);
   }
 
@@ -165,10 +171,7 @@ class DatabaseStorage implements IStorage {
     const [upserted] = await db
       .insert(healthProfiles)
       .values(profile)
-      .onConflictDoUpdate({
-        target: healthProfiles.userId,
-        set: { ...profile, updatedAt: new Date() },
-      })
+      .onConflictDoUpdate({ target: healthProfiles.userId, set: { ...profile, updatedAt: new Date() } })
       .returning();
     return upserted;
   }

@@ -8,6 +8,8 @@ import { useAuth } from "@/hooks/use-auth";
 
 import { NutrisenseDigital } from "@/pages/NutrisenseDigital";
 import { LandingPage } from "@/pages/LandingPage";
+import { LoginPage } from "@/pages/LoginPage";
+import { RegisterPage } from "@/pages/RegisterPage";
 
 function LoadingScreen() {
   return (
@@ -27,24 +29,21 @@ function Router() {
 
   return (
     <Switch>
-      <Route path="/landing" component={LandingPage} />
+      <Route path="/login" component={LoginPage} />
+      <Route path="/register" component={RegisterPage} />
 
       <Route path="/">
         {isAuthenticated ? <NutrisenseDigital activePage="pantry" /> : <LandingPage />}
       </Route>
-
       <Route path="/dashboard">
         {isAuthenticated ? <NutrisenseDigital activePage="dashboard" /> : <LandingPage />}
       </Route>
-
       <Route path="/log-meal">
         {isAuthenticated ? <NutrisenseDigital activePage="log-meal" /> : <LandingPage />}
       </Route>
-
       <Route path="/insights">
         {isAuthenticated ? <NutrisenseDigital activePage="insights" /> : <LandingPage />}
       </Route>
-
       <Route path="/profile">
         {isAuthenticated ? <NutrisenseDigital activePage="profile" /> : <LandingPage />}
       </Route>

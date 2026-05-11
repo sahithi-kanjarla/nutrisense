@@ -11,17 +11,11 @@ const primaryNavItems = [
   { label: "Profile", href: "/profile", icon: "👤" },
 ];
 
-const secondaryNavItems = [
-  { label: "Settings", href: "/profile", icon: "⚙️", destructive: false },
-  { label: "Support", href: "#", icon: "❓", destructive: false },
-  { label: "Logout", href: "/api/logout", icon: "🚪", destructive: true },
-];
-
 export const SidebarNavigationSection = (): JSX.Element => {
   const [location, navigate] = useLocation();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
-  const firstName = user?.firstName || "User";
+  const firstName = user?.firstName || "there";
 
   return (
     <aside className="flex h-full min-h-screen w-full max-w-72 flex-col gap-2 overflow-y-auto border-r border-[#b1b3a94c] bg-[#fafaf3] p-6">
@@ -50,13 +44,7 @@ export const SidebarNavigationSection = (): JSX.Element => {
               key={item.label}
               type="button"
               variant="ghost"
-              onClick={() => {
-                if (item.href.startsWith("/api")) {
-                  window.location.href = item.href;
-                } else {
-                  navigate(item.href);
-                }
-              }}
+              onClick={() => navigate(item.href)}
               className={`h-auto w-full justify-start gap-3 rounded-full px-5 py-3.5 hover:bg-[#eef0e8] ${
                 isActive
                   ? "bg-[#9df197] text-[#005c15] shadow-[0px_1px_2px_#0000000d] hover:bg-[#9df197]"
@@ -77,33 +65,29 @@ export const SidebarNavigationSection = (): JSX.Element => {
       </nav>
 
       <section className="flex flex-col pb-4 pt-8">
-        <div className="border-t border-[#b1b3a94c] pt-4">
-          <nav aria-label="Secondary" className="flex flex-col gap-2">
-            {secondaryNavItems.map((item) => (
-              <Button
-                key={item.label}
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  if (item.href.startsWith("/api") || item.href === "#") {
-                    window.location.href = item.href;
-                  } else {
-                    navigate(item.href);
-                  }
-                }}
-                className="h-auto w-full justify-start gap-3 rounded-full px-5 py-3.5 text-[#5d6058] hover:bg-[#eef0e8]"
-              >
-                <span className="text-lg">{item.icon}</span>
-                <span
-                  className={`[font-family:'Plus_Jakarta_Sans',Helvetica] text-base font-semibold leading-6 ${
-                    item.destructive ? "text-[#aa371c]" : "text-[#5d6058]"
-                  }`}
-                >
-                  {item.label}
-                </span>
-              </Button>
-            ))}
-          </nav>
+        <div className="border-t border-[#b1b3a94c] pt-4 flex flex-col gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => navigate("/profile")}
+            className="h-auto w-full justify-start gap-3 rounded-full px-5 py-3.5 text-[#5d6058] hover:bg-[#eef0e8]"
+          >
+            <span className="text-lg">⚙️</span>
+            <span className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-base font-semibold leading-6 text-[#5d6058]">
+              Settings
+            </span>
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={logout}
+            className="h-auto w-full justify-start gap-3 rounded-full px-5 py-3.5 text-[#aa371c] hover:bg-[#fff0ec]"
+          >
+            <span className="text-lg">🚪</span>
+            <span className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-base font-semibold leading-6 text-[#aa371c]">
+              Logout
+            </span>
+          </Button>
         </div>
       </section>
 

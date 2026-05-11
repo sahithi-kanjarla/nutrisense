@@ -1,7 +1,10 @@
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 export function LandingPage() {
+  const [, setLocation] = useLocation();
+
   return (
     <div className="min-h-screen bg-[#fafaf3] flex flex-col items-center justify-center px-4">
       <div className="max-w-lg w-full text-center flex flex-col items-center gap-8">
@@ -9,7 +12,7 @@ export function LandingPage() {
           <div className="w-16 h-16 rounded-full bg-[#9df197] flex items-center justify-center text-3xl">
             🌿
           </div>
-          <h1 className="text-4xl font-extrabold text-green-800 tracking-tight [font-family:'Plus_Jakarta_Sans',Helvetica]">
+          <h1 className="text-4xl font-extrabold text-[#1c6d25] tracking-tight [font-family:'Plus_Jakarta_Sans',Helvetica]">
             NutriSense
           </h1>
           <p className="text-sm font-bold tracking-[1.4px] text-[#b32d02] [font-family:'Manrope',Helvetica]">
@@ -43,12 +46,23 @@ export function LandingPage() {
           ))}
         </div>
 
-        <Button
-          onClick={() => { window.location.href = "/api/login"; }}
-          className="w-full h-14 rounded-full bg-[#1c6d25] text-[#eaffe2] text-base font-bold [font-family:'Manrope',Helvetica] hover:bg-[#185c20] shadow-lg"
-        >
-          Get Started — Log In
-        </Button>
+        <div className="flex flex-col gap-3 w-full">
+          <Button
+            onClick={() => setLocation("/register")}
+            className="w-full h-14 rounded-full bg-[#1c6d25] text-[#eaffe2] text-base font-bold [font-family:'Manrope',Helvetica] hover:bg-[#185c20] shadow-lg"
+            data-testid="button-get-started"
+          >
+            Get Started — It's Free
+          </Button>
+          <Button
+            onClick={() => setLocation("/login")}
+            variant="ghost"
+            className="w-full h-12 rounded-full text-[#1c6d25] font-bold [font-family:'Manrope',Helvetica] hover:bg-[#f4f4ec]"
+            data-testid="button-login"
+          >
+            Already have an account? Sign In
+          </Button>
+        </div>
 
         <p className="text-xs text-[#5d6058] [font-family:'Manrope',Helvetica]">
           Free to use. Designed for Indian households.

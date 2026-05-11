@@ -20,7 +20,7 @@ const ai = new GoogleGenAI({
 });
 
 function getUserId(req: any): string {
-  return req.user?.claims?.sub;
+  return req.session?.userId;
 }
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
