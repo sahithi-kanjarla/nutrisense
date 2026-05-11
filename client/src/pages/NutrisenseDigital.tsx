@@ -1,15 +1,27 @@
-import { PantryOverviewSection } from "./sections/PantryOverviewSection";
 import { SidebarNavigationSection } from "./sections/SidebarNavigationSection";
+import { PantryOverviewSection } from "./sections/PantryOverviewSection";
+import { DashboardPage } from "./DashboardPage";
+import { LogMealPage } from "./LogMealPage";
+import { InsightsPage } from "./InsightsPage";
+import { ProfilePage } from "./ProfilePage";
 
-export const NutrisenseDigital = (): JSX.Element => {
+interface Props {
+  activePage?: "pantry" | "dashboard" | "log-meal" | "insights" | "profile";
+}
+
+export const NutrisenseDigital = ({ activePage = "pantry" }: Props): JSX.Element => {
   return (
-    <main className="bg-[linear-gradient(0deg,rgba(250,250,243,1)_0%,rgba(250,250,243,1)_100%),linear-gradient(0deg,rgba(255,255,255,1)_0%,rgba(255,255,255,1)_100%)]">
-      <div className="grid grid-cols-[22%_78%]">
-        <aside className="border-r border-[#d9d9d1] bg-transparent">
+    <main className="bg-[#fafaf3] min-h-screen">
+      <div className="grid grid-cols-[280px_1fr]">
+        <aside className="border-r border-[#d9d9d1] bg-transparent sticky top-0 h-screen overflow-y-auto">
           <SidebarNavigationSection />
         </aside>
-        <section className="min-w-0">
-          <PantryOverviewSection />
+        <section className="min-w-0 overflow-y-auto">
+          {activePage === "pantry" && <PantryOverviewSection />}
+          {activePage === "dashboard" && <DashboardPage />}
+          {activePage === "log-meal" && <LogMealPage />}
+          {activePage === "insights" && <InsightsPage />}
+          {activePage === "profile" && <ProfilePage />}
         </section>
       </div>
     </main>
