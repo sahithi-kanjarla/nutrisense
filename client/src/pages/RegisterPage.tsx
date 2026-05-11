@@ -29,7 +29,7 @@ export function RegisterPage() {
     },
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/auth/user"], user);
-      setLocation("/");
+      setLocation("/onboarding");
     },
     onError: (e: Error) => {
       toast({ title: "Registration failed", description: e.message, variant: "destructive" });

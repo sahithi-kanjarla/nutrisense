@@ -10,6 +10,7 @@ import { NutrisenseDigital } from "@/pages/NutrisenseDigital";
 import { LandingPage } from "@/pages/LandingPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { RegisterPage } from "@/pages/RegisterPage";
+import { OnboardingPage } from "@/pages/OnboardingPage";
 
 function LoadingScreen() {
   return (
@@ -31,6 +32,9 @@ function Router() {
     <Switch>
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
+      <Route path="/onboarding">
+        {isAuthenticated ? <OnboardingPage /> : <LandingPage />}
+      </Route>
 
       <Route path="/">
         {isAuthenticated ? <NutrisenseDigital activePage="pantry" /> : <LandingPage />}
