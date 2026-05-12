@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,11 +27,60 @@ const categoryEmoji: Record<string, string> = {
   "Dairy": "🥛", "Superfoods": "🌱", "Snacks": "🍿", "Beverages": "☕", "Other": "🥗",
 };
 
-const quickScanItems = [
-  { id: "jeera", name: "Jeera (Cumin\nSeeds)", detail: "Essential for digestion" },
-  { id: "haldi", name: "Haldi (Turmeric)", detail: "Anti-inflammatory gold" },
-  { id: "curry-leaves", name: "Curry Leaves", detail: "Fresh aromatic greens" },
-  { id: "moringa", name: "Moringa Powder", detail: "Superfood nutrient\nboost" },
+// Large pool of Indian kitchen items — includes spices, staples, snacks, packaged foods
+const INDIAN_KITCHEN_POOL: { name: string; emoji: string; detail: string; category: string }[] = [
+  // Spices & Condiments
+  { name: "Jeera (Cumin Seeds)", emoji: "🌿", detail: "Aids digestion, anti-bloating", category: "Spices & Condiments" },
+  { name: "Haldi (Turmeric)", emoji: "🌿", detail: "Anti-inflammatory, immunity boost", category: "Spices & Condiments" },
+  { name: "Curry Leaves", emoji: "🌿", detail: "Rich in iron & antioxidants", category: "Spices & Condiments" },
+  { name: "Mustard Seeds (Rai)", emoji: "🌿", detail: "High in selenium & omega-3", category: "Spices & Condiments" },
+  { name: "Coriander Seeds (Dhania)", emoji: "🌿", detail: "Regulates blood sugar", category: "Spices & Condiments" },
+  { name: "Hing (Asafoetida)", emoji: "🌿", detail: "Reduces gas, aids digestion", category: "Spices & Condiments" },
+  { name: "Garam Masala", emoji: "🌿", detail: "Warming blend for flavour", category: "Spices & Condiments" },
+  { name: "Red Chilli Powder", emoji: "🌶️", detail: "Boosts metabolism with capsaicin", category: "Spices & Condiments" },
+  { name: "Cardamom (Elaichi)", emoji: "🌿", detail: "Freshens breath, aids digestion", category: "Spices & Condiments" },
+  { name: "Cinnamon (Dalchini)", emoji: "🌿", detail: "Regulates blood sugar levels", category: "Spices & Condiments" },
+  // Grains & Pulses
+  { name: "Moong Dal", emoji: "🫘", detail: "High protein, easy to digest", category: "Grains & Pulses" },
+  { name: "Toor Dal (Arhar)", emoji: "🫘", detail: "Rich in protein & folate", category: "Grains & Pulses" },
+  { name: "Chana Dal", emoji: "🫘", detail: "Low glycemic, high fibre", category: "Grains & Pulses" },
+  { name: "Rajma (Kidney Beans)", emoji: "🫘", detail: "Excellent protein & iron", category: "Grains & Pulses" },
+  { name: "Basmati Rice", emoji: "🍚", detail: "Low glycemic index rice", category: "Grains & Pulses" },
+  { name: "Whole Wheat Flour (Atta)", emoji: "🌾", detail: "High fibre, better than maida", category: "Grains & Pulses" },
+  { name: "Besan (Chickpea Flour)", emoji: "🌾", detail: "High protein, gluten-free option", category: "Grains & Pulses" },
+  { name: "Poha (Flattened Rice)", emoji: "🍚", detail: "Iron-fortified, quick energy", category: "Grains & Pulses" },
+  { name: "Sooji (Semolina)", emoji: "🌾", detail: "Good source of B vitamins", category: "Grains & Pulses" },
+  { name: "Oats", emoji: "🥣", detail: "Beta-glucan reduces cholesterol", category: "Grains & Pulses" },
+  // Fresh Produce
+  { name: "Onions", emoji: "🧅", detail: "Prebiotics, quercetin antioxidant", category: "Fresh Produce" },
+  { name: "Tomatoes", emoji: "🍅", detail: "Lycopene for heart health", category: "Fresh Produce" },
+  { name: "Garlic", emoji: "🧄", detail: "Antimicrobial, lowers blood pressure", category: "Fresh Produce" },
+  { name: "Ginger (Adrak)", emoji: "🫚", detail: "Anti-nausea, anti-inflammatory", category: "Fresh Produce" },
+  { name: "Green Chillies", emoji: "🌶️", detail: "Vitamin C, metabolism boost", category: "Fresh Produce" },
+  { name: "Spinach (Palak)", emoji: "🥬", detail: "Iron 2.7mg/100g, folate rich", category: "Fresh Produce" },
+  { name: "Methi (Fenugreek Leaves)", emoji: "🥬", detail: "Controls blood sugar, iron rich", category: "Fresh Produce" },
+  { name: "Potatoes", emoji: "🥔", detail: "Potassium, vitamin B6", category: "Fresh Produce" },
+  // Dairy
+  { name: "Paneer", emoji: "🧀", detail: "High protein, calcium rich", category: "Dairy" },
+  { name: "Curd (Dahi)", emoji: "🥛", detail: "Probiotics for gut health", category: "Dairy" },
+  { name: "Ghee", emoji: "🧈", detail: "Healthy fats, vitamin A & D", category: "Dairy" },
+  { name: "Amul Butter", emoji: "🧈", detail: "Vitamin A, energy dense", category: "Dairy" },
+  // Superfoods
+  { name: "Moringa Powder", emoji: "🌱", detail: "Iron 28mg/100g, complete protein", category: "Superfoods" },
+  { name: "Flax Seeds (Alsi)", emoji: "🌱", detail: "Omega-3 fatty acids, fibre", category: "Superfoods" },
+  { name: "Chia Seeds", emoji: "🌱", detail: "Calcium, protein, omega-3", category: "Superfoods" },
+  { name: "Sesame Seeds (Til)", emoji: "🌱", detail: "Iron 14.6mg/100g, calcium", category: "Superfoods" },
+  { name: "Pumpkin Seeds", emoji: "🌱", detail: "Zinc, magnesium, protein", category: "Superfoods" },
+  // Snacks & Packaged
+  { name: "Roasted Peanuts (Moongfali)", emoji: "🥜", detail: "Protein 26g/100g, healthy fats", category: "Snacks" },
+  { name: "Fox Nuts (Makhana)", emoji: "🍿", detail: "Low calorie, high protein snack", category: "Snacks" },
+  { name: "Murmura (Puffed Rice)", emoji: "🍿", detail: "Light, low calorie evening snack", category: "Snacks" },
+  { name: "Chivda (Namkeen Mix)", emoji: "🍿", detail: "Quick energy snack", category: "Snacks" },
+  { name: "Khakhra", emoji: "🍪", detail: "Whole wheat, low calorie crisp", category: "Snacks" },
+  // Beverages
+  { name: "Masala Chai Mix", emoji: "☕", detail: "Antioxidants from spice blend", category: "Beverages" },
+  { name: "Haldi Doodh Mix", emoji: "🥛", detail: "Golden milk for immunity", category: "Beverages" },
+  { name: "Sattu (Roasted Gram Flour)", emoji: "🥤", detail: "Protein 22g/100g, cooling drink", category: "Beverages" },
 ];
 
 const staticPantrySections = [
@@ -62,24 +111,31 @@ async function imageToBase64(file: File): Promise<{ base64: string; mimeType: st
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
-      const base64 = result.split(",")[1];
-      resolve({ base64, mimeType: file.type });
+      resolve({ base64: result.split(",")[1], mimeType: file.type });
     };
     reader.readAsDataURL(file);
   });
+}
+
+function pickSuggestions(pantryItems: PantryItem[], count = 4) {
+  const pantryNames = pantryItems.map((p) => p.name.toLowerCase());
+  const available = INDIAN_KITCHEN_POOL.filter(
+    (item) => !pantryNames.some((n) => n.includes(item.name.toLowerCase().split(" ")[0].toLowerCase()) || item.name.toLowerCase().includes(n.split(" ")[0]))
+  );
+  // Shuffle and pick count items
+  const shuffled = [...available].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
 }
 
 export const PantryOverviewSection = (): JSX.Element => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Add item form
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({
     name: "", category: "Grains & Pulses", quantity: "", unit: "", notes: "", expiresAt: "",
   });
 
-  // Scan modal
   const [scanOpen, setScanOpen] = useState(false);
   const [scanMode, setScanMode] = useState<"item" | "expiry">("item");
   const [scanLoading, setScanLoading] = useState(false);
@@ -88,16 +144,25 @@ export const PantryOverviewSection = (): JSX.Element => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  // Quick scan
-  const [scanAnswers, setScanAnswers] = useState<Record<string, string>>({
-    jeera: "yes", haldi: "yes", "curry-leaves": "yes", moringa: "yes",
-  });
+  // Quick scan state
+  const [scanAnswers, setScanAnswers] = useState<boolean[]>([]);
   const [scanSubmitted, setScanSubmitted] = useState(false);
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [scanLoading2, setScanLoading2] = useState(false);
+  // Force re-pick when user clicks "Scan Again"
+  const [scanSeed, setScanSeed] = useState(0);
 
   const { data: pantryItems = [] } = useQuery<PantryItem[]>({ queryKey: ["/api/pantry"] });
   const { data: expiringItems = [] } = useQuery<PantryItem[]>({ queryKey: ["/api/pantry/expiring"] });
+
+  // Dynamic suggestions: 4 items NOT already in pantry
+  const suggestedItems = useMemo(() => {
+    return pickSuggestions(pantryItems, 4);
+  }, [pantryItems, scanSeed]); // eslint-disable-line
+
+  // Initialise answers when suggestions change
+  const initAnswers = useMemo(() => new Array(suggestedItems.length).fill(false), [suggestedItems]);
+  const [localAnswers, setLocalAnswers] = useState<boolean[]>(initAnswers);
 
   const addItem = useMutation({
     mutationFn: async (data: any) => {
@@ -126,10 +191,7 @@ export const PantryOverviewSection = (): JSX.Element => {
 
   const handleAddSubmit = () => {
     if (!addForm.name.trim()) return toast({ title: "Please enter an item name", variant: "destructive" });
-    addItem.mutate({
-      ...addForm,
-      expiresAt: addForm.expiresAt || undefined,
-    });
+    addItem.mutate({ ...addForm, expiresAt: addForm.expiresAt || undefined });
     setAddOpen(false);
     setAddForm({ name: "", category: "Grains & Pulses", quantity: "", unit: "", notes: "", expiresAt: "" });
   };
@@ -152,8 +214,7 @@ export const PantryOverviewSection = (): JSX.Element => {
       if (scanMode === "item") {
         if (data.name) {
           setAddForm((f) => ({
-            ...f,
-            name: data.name,
+            ...f, name: data.name,
             category: data.category || f.category,
             quantity: data.quantity || f.quantity,
             unit: data.unit || f.unit,
@@ -172,13 +233,9 @@ export const PantryOverviewSection = (): JSX.Element => {
           toast({ title: "Expiry date found!", description: `Expires: ${data.expiresAt}` });
         } else if (data.retryOtherSide) {
           setExpiryRetry(true);
-          toast({
-            title: "Date not found on this side",
-            description: "Please try the other side or back of the box/packet.",
-            variant: "destructive",
-          });
+          toast({ title: "Date not found on this side", description: "Try the other side of the box.", variant: "destructive" });
         } else {
-          toast({ title: "No expiry date found", description: "Enter the date manually below.", variant: "destructive" });
+          toast({ title: "No expiry date found", description: "Enter the date manually.", variant: "destructive" });
           setScanOpen(false);
         }
       }
@@ -192,11 +249,13 @@ export const PantryOverviewSection = (): JSX.Element => {
   const handleQuickScan = async () => {
     setScanLoading2(true);
     try {
+      const confirmedItems = suggestedItems.filter((_, i) => localAnswers[i]).map((item) => item.name);
+      const answers = localAnswers.map((v) => v ? "yes" : "no");
       const res = await fetch("/api/ai/quick-scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ answers: scanAnswers }),
+        body: JSON.stringify({ answers, items: suggestedItems.map((i) => i.name) }),
       });
       const data = await res.json();
       setScanResult(data.suggestions);
@@ -207,6 +266,13 @@ export const PantryOverviewSection = (): JSX.Element => {
     } finally {
       setScanLoading2(false);
     }
+  };
+
+  const resetScan = () => {
+    setScanSubmitted(false);
+    setScanResult(null);
+    setScanSeed((s) => s + 1);
+    setLocalAnswers(new Array(4).fill(false));
   };
 
   const grouped = pantryItems.reduce<Record<string, PantryItem[]>>((acc, item) => {
@@ -220,54 +286,30 @@ export const PantryOverviewSection = (): JSX.Element => {
   return (
     <section className="relative w-full px-8 pt-12 pb-24">
       {/* Hidden file inputs */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => { if (e.target.files?.[0]) handleImageScan(e.target.files[0]); e.target.value = ""; }}
-      />
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => { if (e.target.files?.[0]) handleImageScan(e.target.files[0]); e.target.value = ""; }}
-      />
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
+        onChange={(e) => { if (e.target.files?.[0]) handleImageScan(e.target.files[0]); e.target.value = ""; }} />
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden"
+        onChange={(e) => { if (e.target.files?.[0]) handleImageScan(e.target.files[0]); e.target.value = ""; }} />
 
       {/* Add Item Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="rounded-3xl bg-[#fafaf3] border-0 max-w-md">
           <DialogHeader>
-            <DialogTitle className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-xl font-bold text-[#31332c]">
-              Add Pantry Item
-            </DialogTitle>
+            <DialogTitle className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-xl font-bold text-[#31332c]">Add Pantry Item</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-4">
             <div>
               <Label className="[font-family:'Manrope',Helvetica] text-xs font-bold text-[#5d6058]">Item Name *</Label>
-              <Input
-                className="mt-1 rounded-xl border-[#b1b3a9] bg-white"
-                placeholder="e.g. Moong Dal, Basmati Rice..."
-                value={addForm.name}
-                onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
-              />
+              <Input className="mt-1 rounded-xl border-[#b1b3a9] bg-white" placeholder="e.g. Moong Dal, Namkeen, Amul Butter..."
+                value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} />
             </div>
             <div>
               <Label className="[font-family:'Manrope',Helvetica] text-xs font-bold text-[#5d6058]">Category</Label>
               <div className="mt-2 flex flex-wrap gap-2">
                 {itemCategories.map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setAddForm({ ...addForm, category: cat })}
+                  <button key={cat} type="button" onClick={() => setAddForm({ ...addForm, category: cat })}
                     className={`rounded-full px-3 py-1 text-xs font-bold [font-family:'Manrope',Helvetica] transition-colors ${
-                      addForm.category === cat
-                        ? "bg-[#1c6d25] text-[#eaffe2]"
-                        : "bg-[#e2e3d9] text-[#5d6058] hover:bg-[#d9dbcf]"
-                    }`}
-                  >
+                      addForm.category === cat ? "bg-[#1c6d25] text-[#eaffe2]" : "bg-[#e2e3d9] text-[#5d6058] hover:bg-[#d9dbcf]"}`}>
                     {cat}
                   </button>
                 ))}
@@ -276,51 +318,28 @@ export const PantryOverviewSection = (): JSX.Element => {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="[font-family:'Manrope',Helvetica] text-xs font-bold text-[#5d6058]">Quantity</Label>
-                <Input
-                  className="mt-1 rounded-xl border-[#b1b3a9] bg-white"
-                  placeholder="500, 2, 1..."
-                  value={addForm.quantity}
-                  onChange={(e) => setAddForm({ ...addForm, quantity: e.target.value })}
-                />
+                <Input className="mt-1 rounded-xl border-[#b1b3a9] bg-white" placeholder="500, 2, 1..."
+                  value={addForm.quantity} onChange={(e) => setAddForm({ ...addForm, quantity: e.target.value })} />
               </div>
               <div>
                 <Label className="[font-family:'Manrope',Helvetica] text-xs font-bold text-[#5d6058]">Unit</Label>
-                <Input
-                  className="mt-1 rounded-xl border-[#b1b3a9] bg-white"
-                  placeholder="g, kg, litres..."
-                  value={addForm.unit}
-                  onChange={(e) => setAddForm({ ...addForm, unit: e.target.value })}
-                />
+                <Input className="mt-1 rounded-xl border-[#b1b3a9] bg-white" placeholder="g, kg, pieces..."
+                  value={addForm.unit} onChange={(e) => setAddForm({ ...addForm, unit: e.target.value })} />
               </div>
             </div>
-
-            {/* Expiry date with scan option */}
             <div>
               <Label className="[font-family:'Manrope',Helvetica] text-xs font-bold text-[#5d6058]">Expiry Date (optional)</Label>
               <div className="mt-1 flex gap-2">
-                <Input
-                  type="date"
-                  className="rounded-xl border-[#b1b3a9] bg-white flex-1"
-                  value={addForm.expiresAt}
-                  onChange={(e) => setAddForm({ ...addForm, expiresAt: e.target.value })}
-                />
-                <button
-                  type="button"
-                  onClick={() => { setScanMode("expiry"); setScanOpen(true); setScanPreview(null); }}
-                  className="rounded-xl bg-[#e2e3d9] px-3 text-sm hover:bg-[#d9dbcf] transition-colors [font-family:'Manrope',Helvetica] font-bold text-[#31332c] whitespace-nowrap"
-                  title="Scan expiry date from packaging"
-                >
+                <Input type="date" className="rounded-xl border-[#b1b3a9] bg-white flex-1"
+                  value={addForm.expiresAt} onChange={(e) => setAddForm({ ...addForm, expiresAt: e.target.value })} />
+                <button type="button" onClick={() => { setScanMode("expiry"); setScanOpen(true); setScanPreview(null); }}
+                  className="rounded-xl bg-[#e2e3d9] px-3 text-sm hover:bg-[#d9dbcf] [font-family:'Manrope',Helvetica] font-bold text-[#31332c] whitespace-nowrap">
                   📷 Scan
                 </button>
               </div>
             </div>
-
-            <Button
-              type="button"
-              onClick={handleAddSubmit}
-              disabled={addItem.isPending}
-              className="w-full rounded-full bg-[#1c6d25] text-[#eaffe2] font-bold [font-family:'Manrope',Helvetica] hover:bg-[#185c20]"
-            >
+            <Button type="button" onClick={handleAddSubmit} disabled={addItem.isPending}
+              className="w-full rounded-full bg-[#1c6d25] text-[#eaffe2] font-bold [font-family:'Manrope',Helvetica] hover:bg-[#185c20]">
               {addItem.isPending ? "Adding..." : "Add to Pantry"}
             </Button>
           </div>
@@ -338,14 +357,10 @@ export const PantryOverviewSection = (): JSX.Element => {
           <div className="flex flex-col gap-4">
             {scanMode === "expiry" && expiryRetry && (
               <div className="rounded-2xl bg-[#fff5ee] border border-[#fa7150] p-4 text-sm [font-family:'Manrope',Helvetica] text-[#aa371c] font-bold">
-                📦 Expiry date not visible — try the other side or back of the box/packet!
+                📦 Date not visible — try the other side of the box!
               </div>
             )}
-
-            {scanPreview && (
-              <img src={scanPreview} alt="Scan preview" className="w-full max-h-48 object-contain rounded-2xl bg-[#f4f4ec]" />
-            )}
-
+            {scanPreview && <img src={scanPreview} alt="Scan preview" className="w-full max-h-48 object-contain rounded-2xl bg-[#f4f4ec]" />}
             {scanLoading ? (
               <div className="flex flex-col items-center gap-3 py-4">
                 <div className="w-10 h-10 border-4 border-[#1c6d25] border-t-transparent rounded-full animate-spin" />
@@ -357,22 +372,15 @@ export const PantryOverviewSection = (): JSX.Element => {
               <>
                 <p className="text-sm text-[#5d6058] [font-family:'Manrope',Helvetica]">
                   {scanMode === "item"
-                    ? "Take a photo or upload an image of your food item. AI will identify the name and category."
-                    : "Take a photo of the packaging where the expiry date is printed. AI will read it automatically."}
+                    ? "Take a photo or upload an image. AI will identify the item and category."
+                    : "Take a photo where the expiry date is printed. AI will read it for you."}
                 </p>
-                <Button
-                  type="button"
-                  onClick={() => cameraInputRef.current?.click()}
-                  className="w-full rounded-full bg-[#1c6d25] text-[#eaffe2] font-bold [font-family:'Manrope',Helvetica] hover:bg-[#185c20]"
-                >
+                <Button type="button" onClick={() => cameraInputRef.current?.click()}
+                  className="w-full rounded-full bg-[#1c6d25] text-[#eaffe2] font-bold [font-family:'Manrope',Helvetica] hover:bg-[#185c20]">
                   📷 Use Camera
                 </Button>
-                <Button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  variant="ghost"
-                  className="w-full rounded-full border border-[#e2e3d9] text-[#31332c] font-bold [font-family:'Manrope',Helvetica] hover:bg-[#f4f4ec]"
-                >
+                <Button type="button" onClick={() => fileInputRef.current?.click()} variant="ghost"
+                  className="w-full rounded-full border border-[#e2e3d9] text-[#31332c] font-bold [font-family:'Manrope',Helvetica] hover:bg-[#f4f4ec]">
                   🖼️ Upload Image
                 </Button>
               </>
@@ -390,24 +398,15 @@ export const PantryOverviewSection = (): JSX.Element => {
             <p className="[font-family:'Manrope',Helvetica] text-lg text-[#5d6058]">Organized, organic, and life-giving. A curated look at your nutrition reservoir.</p>
           </div>
           <div className="flex flex-wrap items-start gap-3">
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-auto rounded-full bg-[#e2e3d9] px-6 py-3 hover:bg-[#d9dbcf]"
-              onClick={() => { setScanMode("item"); setScanOpen(true); setScanPreview(null); }}
-              data-testid="button-scan-item"
-            >
+            <Button type="button" variant="ghost" className="h-auto rounded-full bg-[#e2e3d9] px-6 py-3 hover:bg-[#d9dbcf]"
+              onClick={() => { setScanMode("item"); setScanOpen(true); setScanPreview(null); }} data-testid="button-scan-item">
               <span className="flex items-center gap-3">
                 <span className="text-lg">📷</span>
                 <span className="[font-family:'Manrope',Helvetica] text-sm font-bold text-[#31332c]">Scan Item</span>
               </span>
             </Button>
-            <Button
-              type="button"
-              onClick={() => setAddOpen(true)}
-              className="h-auto rounded-full bg-[#1c6d25] px-6 py-3 hover:bg-[#185c20] shadow-lg"
-              data-testid="button-manual-entry"
-            >
+            <Button type="button" onClick={() => setAddOpen(true)}
+              className="h-auto rounded-full bg-[#1c6d25] px-6 py-3 hover:bg-[#185c20] shadow-lg" data-testid="button-manual-entry">
               <span className="flex items-center gap-3">
                 <span className="text-lg">+</span>
                 <span className="[font-family:'Manrope',Helvetica] text-sm font-bold text-[#eaffe2]">Manual Entry</span>
@@ -451,13 +450,8 @@ export const PantryOverviewSection = (): JSX.Element => {
                                   </p>
                                 )}
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => deleteItem.mutate(item.id)}
-                                className="shrink-0 text-[#b1b3a9] hover:text-[#aa371c] transition-colors text-sm"
-                              >
-                                ✕
-                              </button>
+                              <button type="button" onClick={() => deleteItem.mutate(item.id)}
+                                className="shrink-0 text-[#b1b3a9] hover:text-[#aa371c] transition-colors text-sm">✕</button>
                             </article>
                           );
                         })}
@@ -545,7 +539,7 @@ export const PantryOverviewSection = (): JSX.Element => {
               </CardContent>
             </Card>
 
-            {/* AI Quick Scan */}
+            {/* AI Quick Scan — DYNAMIC */}
             <Card className="relative overflow-hidden rounded-[48px] border-0 bg-[#1c6d25] shadow-[0px_25px_50px_-12px_#00000040]">
               <CardContent className="p-8">
                 <div className="relative flex flex-col gap-4">
@@ -556,65 +550,80 @@ export const PantryOverviewSection = (): JSX.Element => {
 
                   {scanSubmitted && scanResult ? (
                     <>
-                      <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-base font-bold text-[#eaffe2]">Recipe Suggestions</h3>
-                      <p className="[font-family:'Manrope',Helvetica] text-xs text-[#9df197cc] whitespace-pre-line leading-relaxed">{scanResult}</p>
-                      <Button
-                        type="button"
-                        onClick={() => { setScanSubmitted(false); setScanResult(null); }}
-                        className="w-full rounded-full bg-[#096119] text-[#eaffe2] text-xs font-bold [font-family:'Manrope',Helvetica] hover:bg-[#074f14]"
-                      >
-                        Scan Again
+                      <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-base font-bold text-[#eaffe2]">🍽️ Recipe Ideas For You</h3>
+                      <div className="max-h-72 overflow-y-auto">
+                        <p className="[font-family:'Manrope',Helvetica] text-xs text-[#9df197cc] whitespace-pre-line leading-relaxed">{scanResult}</p>
+                      </div>
+                      <Button type="button" onClick={resetScan}
+                        className="w-full rounded-full bg-[#096119] text-[#eaffe2] text-xs font-bold [font-family:'Manrope',Helvetica] hover:bg-[#074f14]">
+                        🔄 Scan Different Items
                       </Button>
                     </>
                   ) : (
                     <>
-                      <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-xl font-bold text-[#eaffe2]">Most Indian kitchens have these — do you?</h3>
-                      <div className="flex flex-col gap-6">
-                        {quickScanItems.map((item, i) => (
-                          <div key={item.id} className={`flex items-start justify-between gap-4 ${i < quickScanItems.length - 1 ? "border-b border-[#0961194c] pb-4" : ""}`}>
-                            <div className="flex flex-col">
-                              <h4 className="whitespace-pre-line [font-family:'Manrope',Helvetica] text-base font-bold text-[#eaffe2]">{item.name}</h4>
-                              <p className="whitespace-pre-line [font-family:'Manrope',Helvetica] text-xs text-[#9df197cc]">{item.detail}</p>
+                      <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-lg font-bold text-[#eaffe2]">
+                        Do you have any of these at home?
+                      </h3>
+                      <p className="[font-family:'Manrope',Helvetica] text-xs text-[#9df197cc]">
+                        Mark what you have — we'll suggest recipes, filter your allergens, and show nutrition info.
+                      </p>
+                      <div className="flex flex-col gap-4">
+                        {suggestedItems.map((item, i) => (
+                          <div key={`${item.name}-${scanSeed}`}
+                            className={`flex items-start justify-between gap-4 ${i < suggestedItems.length - 1 ? "border-b border-[#0961194c] pb-4" : ""}`}>
+                            <div className="flex flex-col min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-base">{item.emoji}</span>
+                                <h4 className="[font-family:'Manrope',Helvetica] text-sm font-bold text-[#eaffe2]">{item.name}</h4>
+                              </div>
+                              <p className="[font-family:'Manrope',Helvetica] text-[10px] text-[#9df197cc] mt-0.5">{item.detail}</p>
+                              <Badge className="mt-1 w-fit rounded-full bg-[#074f14] px-2 py-0 text-[9px] font-bold text-[#9df197] hover:bg-[#074f14] [font-family:'Manrope',Helvetica]">
+                                {item.category}
+                              </Badge>
                             </div>
-                            <ToggleGroup
-                              type="single"
-                              value={scanAnswers[item.id]}
-                              onValueChange={(value) => { if (value) setScanAnswers((prev) => ({ ...prev, [item.id]: value })); }}
-                              className="flex shrink-0 gap-2"
-                            >
-                              <ToggleGroupItem value="yes" className="h-auto rounded-full border-0 px-3 py-1 data-[state=on]:bg-[#9df197] data-[state=on]:text-[#005c15] data-[state=off]:bg-[#096119] data-[state=off]:text-[#eaffe2]">
-                                <span className="[font-family:'Manrope',Helvetica] text-xs font-bold">Yes</span>
+                            <ToggleGroup type="single" value={localAnswers[i] ? "yes" : "no"}
+                              onValueChange={(v) => {
+                                if (!v) return;
+                                setLocalAnswers((prev) => {
+                                  const next = [...prev];
+                                  next[i] = v === "yes";
+                                  return next;
+                                });
+                              }}
+                              className="flex shrink-0 gap-1">
+                              <ToggleGroupItem value="yes"
+                                className="h-auto rounded-full border-0 px-2.5 py-1 text-xs data-[state=on]:bg-[#9df197] data-[state=on]:text-[#005c15] data-[state=off]:bg-[#096119] data-[state=off]:text-[#eaffe2]">
+                                Yes
                               </ToggleGroupItem>
-                              <ToggleGroupItem value="no" className="h-auto rounded-full border-0 px-3 py-1 data-[state=on]:bg-[#9df197] data-[state=on]:text-[#005c15] data-[state=off]:bg-[#096119] data-[state=off]:text-[#eaffe2]">
-                                <span className="[font-family:'Manrope',Helvetica] text-xs font-bold">No</span>
+                              <ToggleGroupItem value="no"
+                                className="h-auto rounded-full border-0 px-2.5 py-1 text-xs data-[state=on]:bg-[#aa371c] data-[state=on]:text-white data-[state=off]:bg-[#096119] data-[state=off]:text-[#eaffe2]">
+                                No
                               </ToggleGroupItem>
                             </ToggleGroup>
                           </div>
                         ))}
                       </div>
-                      <Button
-                        type="button"
-                        onClick={handleQuickScan}
-                        disabled={scanLoading2}
-                        className="mt-2 w-full rounded-full bg-[#9df197] text-[#005c15] font-bold [font-family:'Manrope',Helvetica] hover:bg-[#7de877]"
-                      >
-                        {scanLoading2 ? "Scanning..." : "Get Recipe Ideas"}
+                      <Button type="button" onClick={handleQuickScan} disabled={scanLoading2}
+                        className="mt-1 w-full rounded-full bg-[#9df197] text-[#005c15] font-bold [font-family:'Manrope',Helvetica] hover:bg-[#7de877]">
+                        {scanLoading2 ? "Getting recipes..." : "✨ Get Recipe Ideas"}
                       </Button>
+                      <button type="button" onClick={resetScan}
+                        className="text-center text-[10px] text-[#9df197cc] hover:text-[#9df197] [font-family:'Manrope',Helvetica]">
+                        Show different items ↻
+                      </button>
                     </>
                   )}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Inventory tags */}
+            {/* Pantry Labels */}
             <Card className="rounded-[48px] border-0 bg-[#ffdeac] shadow-none">
               <CardContent className="p-6">
                 <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-base font-bold text-[#6e4b00] mb-4">Pantry Labels</h3>
                 <div className="flex flex-wrap gap-2">
-                  {["High Fiber", "Protein Rich", "Gluten Free", "Organic", "Low Carb"].map((tag) => (
-                    <Badge key={tag} className="rounded-full bg-white px-3 py-1 [font-family:'Manrope',Helvetica] text-xs font-bold text-[#7f5700] hover:bg-white">
-                      {tag}
-                    </Badge>
+                  {["High Fiber", "Protein Rich", "Iron Rich", "Gluten Free", "Organic", "Low Carb"].map((tag) => (
+                    <Badge key={tag} className="rounded-full bg-white px-3 py-1 [font-family:'Manrope',Helvetica] text-xs font-bold text-[#7f5700] hover:bg-white">{tag}</Badge>
                   ))}
                 </div>
               </CardContent>
