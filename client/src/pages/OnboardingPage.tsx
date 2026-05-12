@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -16,14 +16,14 @@ const dietTypes = [
 ];
 
 const goalOptions = [
-  { value: "Weight Loss", emoji: "⚖️" },
-  { value: "Weight Gain", emoji: "💪" },
-  { value: "Muscle Building", emoji: "🏋️" },
-  { value: "Better Immunity", emoji: "🛡️" },
-  { value: "Heart Health", emoji: "❤️" },
-  { value: "Diabetes Management", emoji: "🩸" },
-  { value: "General Wellness", emoji: "✨" },
-  { value: "Better Digestion", emoji: "🌿" },
+  { value: "Weight Loss", emoji: "⚖️", calorieOffset: -400 },
+  { value: "Weight Gain", emoji: "💪", calorieOffset: 400 },
+  { value: "Muscle Building", emoji: "🏋️", calorieOffset: 300 },
+  { value: "Better Immunity", emoji: "🛡️", calorieOffset: 0 },
+  { value: "Heart Health", emoji: "❤️", calorieOffset: -100 },
+  { value: "Diabetes Management", emoji: "🩸", calorieOffset: -200 },
+  { value: "General Wellness", emoji: "✨", calorieOffset: 0 },
+  { value: "Better Digestion", emoji: "🌿", calorieOffset: 0 },
 ];
 
 const allergyOptions = [
@@ -32,10 +32,22 @@ const allergyOptions = [
 
 const TOTAL_STEPS = 4;
 
+function calcSuggestedCalories(age: string, weightKg: string, heightCm: string, goals: string[]): number | null {
+  const a = parseInt(age), w = parseFloat(weightKg), h = parseFloat(heightCm);
+  if (!a || !w || !h) return null;
+  // Mifflin-St Jeor (gender-neutral average)
+  const bmr = 10 * w + 6.25 * h - 5 * a;
+  const tdee = Math.round(bmr * 1.4); // moderate activity
+  const primaryGoal = goalOptions.find((g) => goals.includes(g.value));
+  const offset = primaryGoal?.calorieOffset ?? 0;
+  return Math.max(1200, Math.min(4000, tdee + offset));
+}
+
 export function OnboardingPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [step, setStep] = useState(1);
+  const [customAllergy, setCustomAllergy] = useState("");
   const [form, setForm] = useState({
     age: "",
     weightKg: "",
@@ -43,12 +55,17 @@ export function OnboardingPage() {
     dietType: "",
     healthGoals: [] as string[],
     allergies: [] as string[],
-    dailyCalorieTarget: "2000",
     waterIntakeLitres: "2.5",
   });
 
+  const suggestedCalories = useMemo(
+    () => calcSuggestedCalories(form.age, form.weightKg, form.heightCm, form.healthGoals),
+    [form.age, form.weightKg, form.heightCm, form.healthGoals]
+  );
+
   const saveProfile = useMutation({
     mutationFn: async (data: typeof form) => {
+      const calories = suggestedCalories || 2000;
       const res = await fetch("/api/profile/health", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -60,7 +77,7 @@ export function OnboardingPage() {
           dietType: data.dietType || "Vegetarian",
           healthGoals: data.healthGoals,
           allergies: data.allergies,
-          dailyCalorieTarget: parseInt(data.dailyCalorieTarget) || 2000,
+          dailyCalorieTarget: calories,
           waterIntakeLitres: data.waterIntakeLitres || "2.5",
         }),
       });
@@ -74,23 +91,33 @@ export function OnboardingPage() {
     },
   });
 
-  const toggleGoal = (goal: string) => {
+  const toggleGoal = (goal: string) =>
     setForm((f) => ({
       ...f,
       healthGoals: f.healthGoals.includes(goal)
         ? f.healthGoals.filter((g) => g !== goal)
         : [...f.healthGoals, goal],
     }));
-  };
 
-  const toggleAllergy = (allergy: string) => {
+  const toggleAllergy = (allergy: string) =>
     setForm((f) => ({
       ...f,
       allergies: f.allergies.includes(allergy)
         ? f.allergies.filter((a) => a !== allergy)
         : [...f.allergies, allergy],
     }));
+
+  const addCustomAllergy = () => {
+    const val = customAllergy.trim();
+    if (!val) return;
+    if (!form.allergies.includes(val)) {
+      setForm((f) => ({ ...f, allergies: [...f.allergies, val] }));
+    }
+    setCustomAllergy("");
   };
+
+  const removeAllergy = (a: string) =>
+    setForm((f) => ({ ...f, allergies: f.allergies.filter((x) => x !== a) }));
 
   const handleNext = () => {
     if (step < TOTAL_STEPS) setStep(step + 1);
@@ -110,20 +137,13 @@ export function OnboardingPage() {
         {/* Header */}
         <div className="flex flex-col items-center gap-2 text-center">
           <div className="w-12 h-12 rounded-full bg-[#9df197] flex items-center justify-center text-xl">🌿</div>
-          <h1 className="text-2xl font-extrabold text-[#1c6d25] [font-family:'Plus_Jakarta_Sans',Helvetica]">
-            NutriSense
-          </h1>
+          <h1 className="text-2xl font-extrabold text-[#1c6d25] [font-family:'Plus_Jakarta_Sans',Helvetica]">NutriSense</h1>
         </div>
 
         {/* Progress bar */}
         <div className="flex items-center gap-2">
           {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-            <div
-              key={i}
-              className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
-                i < step ? "bg-[#1c6d25]" : "bg-[#e2e3d9]"
-              }`}
-            />
+            <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${i < step ? "bg-[#1c6d25]" : "bg-[#e2e3d9]"}`} />
           ))}
         </div>
         <p className="text-center text-xs font-bold text-[#5d6058] [font-family:'Manrope',Helvetica] -mt-3">
@@ -137,11 +157,9 @@ export function OnboardingPage() {
             {step === 1 && (
               <>
                 <div>
-                  <h2 className="text-xl font-bold text-[#31332c] [font-family:'Plus_Jakarta_Sans',Helvetica]">
-                    Tell us about yourself
-                  </h2>
+                  <h2 className="text-xl font-bold text-[#31332c] [font-family:'Plus_Jakarta_Sans',Helvetica]">Tell us about yourself</h2>
                   <p className="text-sm text-[#5d6058] [font-family:'Manrope',Helvetica] mt-1">
-                    This helps us personalise your nutrition insights.
+                    We'll use this to calculate your ideal calorie and nutrition targets.
                   </p>
                 </div>
                 <div className="flex flex-col gap-4">
@@ -158,9 +176,7 @@ export function OnboardingPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1.5">
-                      <Label className="text-xs font-bold text-[#5d6058] [font-family:'Manrope',Helvetica]">
-                        Weight (kg)
-                      </Label>
+                      <Label className="text-xs font-bold text-[#5d6058] [font-family:'Manrope',Helvetica]">Weight (kg)</Label>
                       <Input
                         type="number"
                         placeholder="e.g. 65"
@@ -171,9 +187,7 @@ export function OnboardingPage() {
                       />
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <Label className="text-xs font-bold text-[#5d6058] [font-family:'Manrope',Helvetica]">
-                        Height (cm)
-                      </Label>
+                      <Label className="text-xs font-bold text-[#5d6058] [font-family:'Manrope',Helvetica]">Height (cm)</Label>
                       <Input
                         type="number"
                         placeholder="e.g. 165"
@@ -184,31 +198,18 @@ export function OnboardingPage() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <Label className="text-xs font-bold text-[#5d6058] [font-family:'Manrope',Helvetica]">
-                        Daily calorie goal
-                      </Label>
-                      <Input
-                        type="number"
-                        placeholder="2000"
-                        value={form.dailyCalorieTarget}
-                        onChange={(e) => setForm({ ...form, dailyCalorieTarget: e.target.value })}
-                        className="rounded-xl border-[#e2e3d9] bg-[#fafaf3]"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <Label className="text-xs font-bold text-[#5d6058] [font-family:'Manrope',Helvetica]">
-                        Water intake (L/day)
-                      </Label>
-                      <Input
-                        type="number"
-                        placeholder="2.5"
-                        value={form.waterIntakeLitres}
-                        onChange={(e) => setForm({ ...form, waterIntakeLitres: e.target.value })}
-                        className="rounded-xl border-[#e2e3d9] bg-[#fafaf3]"
-                      />
-                    </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs font-bold text-[#5d6058] [font-family:'Manrope',Helvetica]">Water intake goal (L/day)</Label>
+                    <Input
+                      type="number"
+                      placeholder="2.5"
+                      value={form.waterIntakeLitres}
+                      onChange={(e) => setForm({ ...form, waterIntakeLitres: e.target.value })}
+                      className="rounded-xl border-[#e2e3d9] bg-[#fafaf3]"
+                    />
+                  </div>
+                  <div className="rounded-2xl bg-[#f4f4ec] p-4 text-xs text-[#5d6058] [font-family:'Manrope',Helvetica]">
+                    💡 Your daily calorie target will be automatically calculated based on your body stats and goals — no guesswork needed!
                   </div>
                 </div>
               </>
@@ -218,12 +219,8 @@ export function OnboardingPage() {
             {step === 2 && (
               <>
                 <div>
-                  <h2 className="text-xl font-bold text-[#31332c] [font-family:'Plus_Jakarta_Sans',Helvetica]">
-                    What's your diet type?
-                  </h2>
-                  <p className="text-sm text-[#5d6058] [font-family:'Manrope',Helvetica] mt-1">
-                    We'll tailor recipes and meal plans accordingly.
-                  </p>
+                  <h2 className="text-xl font-bold text-[#31332c] [font-family:'Plus_Jakarta_Sans',Helvetica]">What's your diet type?</h2>
+                  <p className="text-sm text-[#5d6058] [font-family:'Manrope',Helvetica] mt-1">We'll tailor recipes and meal plans accordingly.</p>
                 </div>
                 <div className="flex flex-col gap-3">
                   {dietTypes.map((d) => (
@@ -243,9 +240,7 @@ export function OnboardingPage() {
                         <p className="font-bold text-[#31332c] [font-family:'Manrope',Helvetica]">{d.value}</p>
                         <p className="text-xs text-[#5d6058] [font-family:'Manrope',Helvetica]">{d.desc}</p>
                       </div>
-                      {form.dietType === d.value && (
-                        <span className="ml-auto text-[#1c6d25] font-bold text-lg">✓</span>
-                      )}
+                      {form.dietType === d.value && <span className="ml-auto text-[#1c6d25] font-bold text-lg">✓</span>}
                     </button>
                   ))}
                 </div>
@@ -256,11 +251,9 @@ export function OnboardingPage() {
             {step === 3 && (
               <>
                 <div>
-                  <h2 className="text-xl font-bold text-[#31332c] [font-family:'Plus_Jakarta_Sans',Helvetica]">
-                    What are your health goals?
-                  </h2>
+                  <h2 className="text-xl font-bold text-[#31332c] [font-family:'Plus_Jakarta_Sans',Helvetica]">What are your health goals?</h2>
                   <p className="text-sm text-[#5d6058] [font-family:'Manrope',Helvetica] mt-1">
-                    Pick as many as apply — we'll personalise your insights.
+                    Pick as many as apply — we'll calculate your calorie target and personalise your plan.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3">
@@ -281,10 +274,25 @@ export function OnboardingPage() {
                     </button>
                   ))}
                 </div>
-                {form.healthGoals.length === 0 && (
-                  <p className="text-xs text-[#b32d02] [font-family:'Manrope',Helvetica]">
-                    Please select at least one goal to continue.
-                  </p>
+
+                {/* Smart calorie suggestion */}
+                {suggestedCalories && form.healthGoals.length > 0 ? (
+                  <div className="rounded-2xl bg-[#eaffe2] border border-[#9df197] p-4 flex items-center gap-3">
+                    <span className="text-2xl">🎯</span>
+                    <div>
+                      <p className="text-xs font-bold text-[#1c6d25] [font-family:'Manrope',Helvetica]">RECOMMENDED FOR YOU</p>
+                      <p className="text-xl font-extrabold text-[#1c6d25] [font-family:'Plus_Jakarta_Sans',Helvetica]">{suggestedCalories} kcal/day</p>
+                      <p className="text-xs text-[#5d6058] [font-family:'Manrope',Helvetica]">
+                        Based on your body stats + {form.healthGoals[0]}
+                      </p>
+                    </div>
+                  </div>
+                ) : form.healthGoals.length === 0 ? (
+                  <p className="text-xs text-[#b32d02] [font-family:'Manrope',Helvetica]">Please select at least one goal to continue.</p>
+                ) : (
+                  <div className="rounded-2xl bg-[#f4f4ec] p-4 text-xs text-[#5d6058] [font-family:'Manrope',Helvetica]">
+                    💡 Add your age, weight & height in Step 1 to get a personalised calorie recommendation.
+                  </div>
                 )}
               </>
             )}
@@ -293,13 +301,13 @@ export function OnboardingPage() {
             {step === 4 && (
               <>
                 <div>
-                  <h2 className="text-xl font-bold text-[#31332c] [font-family:'Plus_Jakarta_Sans',Helvetica]">
-                    Any food allergies or intolerances?
-                  </h2>
+                  <h2 className="text-xl font-bold text-[#31332c] [font-family:'Plus_Jakarta_Sans',Helvetica]">Any food allergies or intolerances?</h2>
                   <p className="text-sm text-[#5d6058] [font-family:'Manrope',Helvetica] mt-1">
                     Optional — we'll avoid these in your meal suggestions.
                   </p>
                 </div>
+
+                {/* Preset allergies */}
                 <div className="flex flex-wrap gap-3">
                   {allergyOptions.map((a) => (
                     <button
@@ -317,6 +325,47 @@ export function OnboardingPage() {
                     </button>
                   ))}
                 </div>
+
+                {/* Custom allergy input */}
+                <div className="flex flex-col gap-2">
+                  <Label className="text-xs font-bold text-[#5d6058] [font-family:'Manrope',Helvetica]">Add your own (e.g. Mustard, Fish)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Type allergy name..."
+                      value={customAllergy}
+                      onChange={(e) => setCustomAllergy(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && addCustomAllergy()}
+                      className="rounded-xl border-[#e2e3d9] bg-[#fafaf3] flex-1"
+                      data-testid="input-custom-allergy"
+                    />
+                    <Button
+                      type="button"
+                      onClick={addCustomAllergy}
+                      className="rounded-xl bg-[#aa371c] text-white font-bold [font-family:'Manrope',Helvetica] hover:bg-[#8f2d17] px-4"
+                    >
+                      Add
+                    </Button>
+                  </div>
+                </div>
+
+                {/* All selected allergies (including custom) */}
+                {form.allergies.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-xs font-bold text-[#5d6058] [font-family:'Manrope',Helvetica]">Selected allergies:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {form.allergies.map((a) => (
+                        <span
+                          key={a}
+                          className="flex items-center gap-1.5 rounded-full bg-[#aa371c] text-white px-3 py-1 text-xs font-bold [font-family:'Manrope',Helvetica]"
+                        >
+                          {a}
+                          <button type="button" onClick={() => removeAllergy(a)} className="hover:opacity-70 text-sm leading-none">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="rounded-2xl bg-[#f4f4ec] p-4">
                   <p className="text-xs text-[#5d6058] [font-family:'Manrope',Helvetica]">
                     🎉 Almost there! After this, you'll land on your personalised NutriSense dashboard.
@@ -344,11 +393,7 @@ export function OnboardingPage() {
                 className="flex-1 h-12 rounded-full bg-[#1c6d25] text-[#eaffe2] font-bold [font-family:'Manrope',Helvetica] hover:bg-[#185c20] disabled:opacity-50"
                 data-testid="button-next"
               >
-                {saveProfile.isPending
-                  ? "Saving..."
-                  : step === TOTAL_STEPS
-                  ? "Go to Dashboard →"
-                  : "Continue →"}
+                {saveProfile.isPending ? "Saving..." : step === TOTAL_STEPS ? "Go to Dashboard →" : "Continue →"}
               </Button>
             </div>
 

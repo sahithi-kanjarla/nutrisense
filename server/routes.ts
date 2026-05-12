@@ -9,7 +9,6 @@ import {
   insertConversationSchema,
 } from "@shared/schema";
 import { GoogleGenAI } from "@google/genai";
-import { z } from "zod";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -21,6 +20,19 @@ const ai = new GoogleGenAI({
 
 function getUserId(req: any): string {
   return req.session?.userId;
+}
+
+function buildProfileContext(profile: any): string {
+  if (!profile) return "";
+  const parts: string[] = [];
+  if (profile.age) parts.push(`Age: ${profile.age}`);
+  if (profile.weightKg) parts.push(`Weight: ${profile.weightKg}kg`);
+  if (profile.heightCm) parts.push(`Height: ${profile.heightCm}cm`);
+  if (profile.dietType) parts.push(`Diet: ${profile.dietType}`);
+  if (profile.healthGoals?.length) parts.push(`Goals: ${profile.healthGoals.join(", ")}`);
+  if (profile.allergies?.length) parts.push(`Allergies/Intolerances: ${profile.allergies.join(", ")} — NEVER suggest foods with these`);
+  if (profile.dailyCalorieTarget) parts.push(`Daily calorie target: ${profile.dailyCalorieTarget} kcal`);
+  return parts.join(" | ");
 }
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
@@ -123,7 +135,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // ── AI Chat ───────────────────────────────────────────────────────────────────
+  // ── AI Chat (streaming) ────────────────────────────────────────────────────────
   app.get("/api/conversations", isAuthenticated, async (req: any, res) => {
     try {
       const convos = await storage.getConversations(getUserId(req));
@@ -161,28 +173,47 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // AI chat — streaming
   app.post("/api/conversations/:id/messages", isAuthenticated, async (req: any, res) => {
     const conversationId = Number(req.params.id);
     const { content } = req.body;
     try {
       await storage.createMessage({ conversationId, role: "user", content });
 
-      const history = await storage.getMessages(conversationId);
+      const userId = getUserId(req);
+      const [history, pantry, profile] = await Promise.all([
+        storage.getMessages(conversationId),
+        storage.getPantryItems(userId),
+        storage.getHealthProfile(userId),
+      ]);
+
       const chatMessages = history.slice(0, -1).map((m) => ({
         role: m.role === "assistant" ? "model" : "user",
         parts: [{ text: m.content }],
       }));
 
+      const pantryList = pantry.length
+        ? pantry.map((p) => `${p.name}${p.quantity ? ` (${p.quantity}${p.unit ? " " + p.unit : ""})` : ""}`).join(", ")
+        : "no items tracked yet";
+
+      const profileCtx = buildProfileContext(profile);
+
+      const systemInstruction = `You are NutriSense AI — a warm, knowledgeable nutrition and kitchen assistant built specifically for Indian households.
+
+USER PROFILE: ${profileCtx || "Not set up yet"}
+CURRENT PANTRY: ${pantryList}
+
+Your role:
+- Help manage their digital pantry, suggest recipes using their actual pantry items
+- Give personalised nutrition advice based on their diet type (${profile?.dietType || "vegetarian by default"}) and health goals
+- STRICTLY avoid any foods they are allergic to: ${profile?.allergies?.length ? profile.allergies.join(", ") : "none listed"}
+- Suggest Indian meals, cooking tips, and nutrition facts in the context of Indian cuisine
+- Be culturally aware — mention specific Indian ingredients (dal, roti, sabzi, masalas, chaas, etc.)
+- Keep calorie suggestions aligned with their target of ${profile?.dailyCalorieTarget || 2000} kcal/day
+- Be warm, practical, and concise. Use bullet points for lists. Respond in the same language the user writes in.`;
+
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
-
-      // Build system instruction for NutriSense
-      const systemInstruction = `You are NutriSense AI, a smart nutrition and pantry assistant for Indian households. 
-You help users manage their digital pantry, suggest recipes using Indian ingredients like dal, rice, masalas, 
-fresh vegetables, and more. Provide practical advice about Indian cooking, nutrition, and wellness. 
-Be warm, helpful, and culturally aware of Indian dietary habits (vegetarian, vegan, Jain, etc.).`;
 
       const stream = await ai.models.generateContentStream({
         model: "gemini-2.5-flash",
@@ -213,7 +244,7 @@ Be warm, helpful, and culturally aware of Indian dietary habits (vegetarian, veg
     }
   });
 
-  // ── AI Nutrition Suggestion ───────────────────────────────────────────────────
+  // ── AI Nutrition Plan ─────────────────────────────────────────────────────────
   app.post("/api/ai/nutrition-plan", isAuthenticated, async (req: any, res) => {
     try {
       const userId = getUserId(req);
@@ -222,15 +253,41 @@ Be warm, helpful, and culturally aware of Indian dietary habits (vegetarian, veg
         storage.getHealthProfile(userId),
       ]);
 
-      const pantryList = pantry.map((p) => `${p.name} (${p.quantity || "some"} ${p.unit || ""})`).join(", ");
-      const prompt = `Based on the following Indian pantry items: ${pantryList || "typical Indian kitchen staples"}
-${profile ? `User profile: ${profile.dietType} diet, ${profile.age} years old, goal: ${(profile.healthGoals || []).join(", ")}` : ""}
-Suggest a simple, nutritious one-day meal plan using these ingredients. Focus on Indian dishes. Keep it practical and healthy.`;
+      const pantryList = pantry.length
+        ? pantry.map((p) => `${p.name} (${p.quantity || "some"} ${p.unit || ""})`).join(", ")
+        : "typical Indian kitchen staples (rice, dal, sabzi, roti)";
+
+      const expiringItems = pantry.filter((p) => {
+        if (!p.expiresAt) return false;
+        const days = Math.ceil((new Date(p.expiresAt).getTime() - Date.now()) / 86400000);
+        return days <= 5;
+      });
+
+      const profileCtx = buildProfileContext(profile);
+
+      const prompt = `You are NutriSense AI, a nutrition expert for Indian households.
+
+USER PROFILE: ${profileCtx || "No profile data — assume moderate Indian adult"}
+
+PANTRY ITEMS AVAILABLE: ${pantryList}
+
+${expiringItems.length > 0 ? `⚠️ ITEMS EXPIRING SOON (use these first): ${expiringItems.map((e) => e.name).join(", ")}` : ""}
+
+Create a practical ONE-DAY Indian meal plan using the available pantry items. Requirements:
+- Match their diet type strictly: ${profile?.dietType || "Vegetarian"}
+- Target approximately ${profile?.dailyCalorieTarget || 2000} kcal total for the day
+- AVOID all allergens: ${profile?.allergies?.length ? profile.allergies.join(", ") : "none"}
+- Prioritise any expiring items if listed above
+- Include Breakfast, Lunch, Evening Snack, and Dinner
+- For each meal: name, key ingredients from pantry, estimated calories
+- End with a brief nutrition tip relevant to their main health goal: ${profile?.healthGoals?.[0] || "general wellness"}
+
+Format clearly with meal headers and bullet points.`;
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        config: { maxOutputTokens: 1024 },
+        config: { maxOutputTokens: 1200 },
       });
 
       res.json({ plan: response.text });
@@ -240,35 +297,51 @@ Suggest a simple, nutritious one-day meal plan using these ingredients. Focus on
     }
   });
 
-  // ── AI Quick Scan ─────────────────────────────────────────────────────────────
+  // ── AI Quick Scan (kitchen staples check) ────────────────────────────────────
   app.post("/api/ai/quick-scan", isAuthenticated, async (req: any, res) => {
     try {
       const userId = getUserId(req);
-      const { answers } = req.body; // { jeera: "yes", haldi: "yes", ... }
+      const { answers } = req.body;
 
       const present = Object.entries(answers)
         .filter(([, v]) => v === "yes")
         .map(([k]) => k);
 
-      const prompt = `A user has confirmed they have these items in their Indian kitchen: ${present.join(", ")}.
-Suggest 2-3 quick, healthy recipes they can make with these staples. Keep suggestions simple and practical for daily Indian cooking.`;
+      const profile = await storage.getHealthProfile(userId);
+
+      const nameMap: Record<string, string> = {
+        jeera: "Jeera (Cumin Seeds)",
+        haldi: "Haldi (Turmeric)",
+        "curry-leaves": "Curry Leaves",
+        moringa: "Moringa Powder",
+      };
+
+      const prompt = `You are NutriSense AI, a nutrition expert for Indian kitchens.
+
+The user has confirmed these staple items at home: ${present.map((k) => nameMap[k] || k).join(", ")}.
+
+${profile ? `User profile: ${profile.dietType || "Vegetarian"} diet | Goals: ${(profile.healthGoals || []).join(", ") || "general wellness"} | Avoid: ${(profile.allergies || []).join(", ") || "nothing"}` : ""}
+
+Suggest 2-3 quick, healthy Indian recipes they can make RIGHT NOW with these ingredients (plus common Indian pantry basics like onion, tomato, oil, salt). 
+
+For each recipe:
+- Recipe name (authentic Indian name)
+- Time to make
+- Key health benefit (1 line)
+- Basic steps (3-4 bullet points)
+
+Keep it practical, inspiring, and culturally authentic.`;
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        config: { maxOutputTokens: 512 },
+        config: { maxOutputTokens: 700 },
       });
 
-      // Also add confirmed items to pantry
+      // Add confirmed items to pantry
       for (const item of present) {
-        const nameMap: Record<string, string> = {
-          jeera: "Jeera (Cumin Seeds)",
-          haldi: "Haldi (Turmeric)",
-          "curry-leaves": "Curry Leaves",
-          moringa: "Moringa Powder",
-        };
         const exists = (await storage.getPantryItems(userId)).find(
-          (p) => p.name.toLowerCase().includes(item.toLowerCase())
+          (p) => p.name.toLowerCase().includes((nameMap[item] || item).toLowerCase().split(" ")[0])
         );
         if (!exists) {
           await storage.createPantryItem({
@@ -285,6 +358,97 @@ Suggest 2-3 quick, healthy recipes they can make with these staples. Keep sugges
     } catch (e: any) {
       console.error("Quick scan error:", e);
       res.status(500).json({ message: "Failed to process quick scan" });
+    }
+  });
+
+  // ── AI Scan Item from Image ───────────────────────────────────────────────────
+  app.post("/api/ai/scan-item", isAuthenticated, async (req: any, res) => {
+    try {
+      const { base64, mimeType } = req.body;
+      if (!base64) return res.status(400).json({ message: "No image provided" });
+
+      const prompt = `You are a food recognition AI for an Indian household pantry app.
+
+Analyse this image and identify the food item, ingredient, or grocery product shown.
+
+Respond ONLY with valid JSON (no markdown, no code block) in exactly this format:
+{
+  "name": "item name in English (e.g. Moong Dal, Basmati Rice, Amul Butter)",
+  "category": "one of: Grains & Pulses | Fresh Produce | Spices & Condiments | Dairy | Superfoods | Snacks | Beverages | Other",
+  "quantity": "estimated quantity if visible (e.g. 500, 1, 2) or empty string",
+  "unit": "unit if visible (e.g. g, kg, litre, pieces) or empty string"
+}
+
+If you cannot identify a food item, respond: {"name": "", "category": "Other", "quantity": "", "unit": ""}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{
+          role: "user",
+          parts: [
+            { inlineData: { mimeType, data: base64 } },
+            { text: prompt },
+          ],
+        }],
+        config: { maxOutputTokens: 200 },
+      });
+
+      const text = (response.text || "").trim();
+      try {
+        const cleaned = text.replace(/```json|```/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+        res.json(parsed);
+      } catch {
+        res.json({ name: "", category: "Other", quantity: "", unit: "" });
+      }
+    } catch (e: any) {
+      console.error("Scan item error:", e);
+      res.status(500).json({ message: "Failed to scan image" });
+    }
+  });
+
+  // ── AI Scan Expiry Date from Image ────────────────────────────────────────────
+  app.post("/api/ai/scan-expiry", isAuthenticated, async (req: any, res) => {
+    try {
+      const { base64, mimeType } = req.body;
+      if (!base64) return res.status(400).json({ message: "No image provided" });
+
+      const prompt = `You are a food packaging reader AI.
+
+Look at this image carefully for ANY expiry date, best before date, use by date, or manufacturing date printed on the packaging.
+
+Common formats on Indian packaging: DD/MM/YYYY, MM/YYYY, MM-YYYY, "Best Before: Jan 2026", "Exp: 12/26", "BB: 06-2025", etc.
+
+Respond ONLY with valid JSON (no markdown, no code block):
+- If you find an expiry/best-before date: {"expiresAt": "YYYY-MM-DD", "retryOtherSide": false}
+- If the date is not visible on this side of the packaging: {"expiresAt": null, "retryOtherSide": true}  
+- If no date exists at all: {"expiresAt": null, "retryOtherSide": false}
+
+Convert any found date to YYYY-MM-DD format. If only month/year found, use the last day of that month.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{
+          role: "user",
+          parts: [
+            { inlineData: { mimeType, data: base64 } },
+            { text: prompt },
+          ],
+        }],
+        config: { maxOutputTokens: 100 },
+      });
+
+      const text = (response.text || "").trim();
+      try {
+        const cleaned = text.replace(/```json|```/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+        res.json(parsed);
+      } catch {
+        res.json({ expiresAt: null, retryOtherSide: true });
+      }
+    } catch (e: any) {
+      console.error("Scan expiry error:", e);
+      res.status(500).json({ message: "Failed to scan expiry date" });
     }
   });
 

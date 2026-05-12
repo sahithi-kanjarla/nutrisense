@@ -10,8 +10,17 @@ import { useAuth } from "@/hooks/use-auth";
 import type { HealthProfile } from "@shared/schema";
 
 const dietTypes = ["Vegetarian", "Vegan", "Non-Vegetarian", "Jain", "Eggetarian"];
-const goalOptions = ["Weight Loss", "Weight Gain", "Muscle Building", "Better Immunity", "Heart Health", "Diabetes Management", "General Wellness"];
-const commonAllergies = ["Gluten", "Dairy", "Nuts", "Soy", "Eggs", "Shellfish"];
+const goalOptions = [
+  { value: "Weight Loss", emoji: "⚖️" },
+  { value: "Weight Gain", emoji: "💪" },
+  { value: "Muscle Building", emoji: "🏋️" },
+  { value: "Better Immunity", emoji: "🛡️" },
+  { value: "Heart Health", emoji: "❤️" },
+  { value: "Diabetes Management", emoji: "🩸" },
+  { value: "General Wellness", emoji: "✨" },
+  { value: "Better Digestion", emoji: "🌿" },
+];
+const presetAllergies = ["Gluten", "Dairy", "Nuts", "Soy", "Eggs", "Shellfish", "Peanuts", "Sesame"];
 
 export function ProfilePage() {
   const { user, logout } = useAuth();
@@ -30,6 +39,7 @@ export function ProfilePage() {
     healthGoals: [] as string[],
     allergies: [] as string[],
   });
+  const [customAllergy, setCustomAllergy] = useState("");
 
   useEffect(() => {
     if (profile) {
@@ -53,7 +63,6 @@ export function ProfilePage() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          userId: user?.id,
           age: form.age ? Number(form.age) : undefined,
           weightKg: form.weightKg || undefined,
           heightCm: form.heightCm || undefined,
@@ -74,27 +83,42 @@ export function ProfilePage() {
     onError: () => toast({ title: "Error", description: "Could not save profile.", variant: "destructive" }),
   });
 
-  const toggleGoal = (goal: string) => {
+  const toggleGoal = (goal: string) =>
     setForm((f) => ({
       ...f,
       healthGoals: f.healthGoals.includes(goal)
         ? f.healthGoals.filter((g) => g !== goal)
         : [...f.healthGoals, goal],
     }));
-  };
 
-  const toggleAllergy = (allergy: string) => {
+  const toggleAllergy = (allergy: string) =>
     setForm((f) => ({
       ...f,
       allergies: f.allergies.includes(allergy)
         ? f.allergies.filter((a) => a !== allergy)
         : [...f.allergies, allergy],
     }));
+
+  const addCustomAllergy = () => {
+    const val = customAllergy.trim();
+    if (!val) return;
+    if (!form.allergies.includes(val)) {
+      setForm((f) => ({ ...f, allergies: [...f.allergies, val] }));
+    }
+    setCustomAllergy("");
   };
+
+  const removeAllergy = (a: string) =>
+    setForm((f) => ({ ...f, allergies: f.allergies.filter((x) => x !== a) }));
 
   const bmi =
     form.weightKg && form.heightCm
       ? (Number(form.weightKg) / Math.pow(Number(form.heightCm) / 100, 2)).toFixed(1)
+      : null;
+
+  const bmiLabel =
+    bmi
+      ? Number(bmi) < 18.5 ? "Underweight" : Number(bmi) < 25 ? "Healthy" : Number(bmi) < 30 ? "Overweight" : "Obese"
       : null;
 
   return (
@@ -103,15 +127,9 @@ export function ProfilePage() {
         {/* Header */}
         <header className="flex w-full flex-col justify-between gap-6 lg:flex-row lg:items-end">
           <div className="flex flex-col gap-2">
-            <p className="[font-family:'Manrope',Helvetica] text-sm font-bold tracking-[1.4px] text-[#b32d02]">
-              YOUR WELLNESS PROFILE
-            </p>
-            <h2 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-5xl font-extrabold tracking-tight text-[#31332c]">
-              Profile
-            </h2>
-            <p className="[font-family:'Manrope',Helvetica] text-lg text-[#5d6058]">
-              Personalise NutriSense to your dietary needs and health goals.
-            </p>
+            <p className="[font-family:'Manrope',Helvetica] text-sm font-bold tracking-[1.4px] text-[#b32d02]">YOUR WELLNESS PROFILE</p>
+            <h2 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-5xl font-extrabold tracking-tight text-[#31332c]">Profile</h2>
+            <p className="[font-family:'Manrope',Helvetica] text-lg text-[#5d6058]">Personalise NutriSense to your dietary needs and health goals.</p>
           </div>
           <Button
             onClick={() => logout()}
@@ -127,14 +145,10 @@ export function ProfilePage() {
             {/* User Info */}
             <Card className="rounded-[48px] border-0 bg-[#f4f4ec] shadow-none">
               <CardContent className="p-8">
-                <div className="flex items-center gap-4 mb-6">
-                  {user?.profileImageUrl ? (
-                    <img src={user.profileImageUrl} alt="Profile" className="w-16 h-16 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-16 h-16 rounded-full bg-[#9df197] flex items-center justify-center text-2xl font-bold text-[#1c6d25] [font-family:'Plus_Jakarta_Sans',Helvetica]">
-                      {user?.firstName?.[0] || "U"}
-                    </div>
-                  )}
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-[#9df197] flex items-center justify-center text-2xl font-bold text-[#1c6d25] [font-family:'Plus_Jakarta_Sans',Helvetica]">
+                    {user?.firstName?.[0] || "U"}
+                  </div>
                   <div>
                     <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-xl font-bold text-[#31332c]">
                       {user?.firstName} {user?.lastName}
@@ -148,45 +162,31 @@ export function ProfilePage() {
             {/* Body Stats */}
             <Card className="rounded-[48px] border-0 bg-[#f4f4ec] shadow-none">
               <CardContent className="p-8">
-                <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-xl font-bold text-[#31332c] mb-6">
-                  Body Stats
-                </h3>
+                <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-xl font-bold text-[#31332c] mb-6">Body Stats</h3>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                   <div>
                     <Label className="[font-family:'Manrope',Helvetica] text-xs font-bold text-[#5d6058]">Age</Label>
-                    <Input
-                      type="number"
-                      className="mt-1 rounded-xl border-[#b1b3a9] bg-white"
-                      placeholder="Years"
-                      value={form.age}
-                      onChange={(e) => setForm({ ...form, age: e.target.value })}
-                    />
+                    <Input type="number" className="mt-1 rounded-xl border-[#b1b3a9] bg-white" placeholder="Years"
+                      value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} />
                   </div>
                   <div>
                     <Label className="[font-family:'Manrope',Helvetica] text-xs font-bold text-[#5d6058]">Weight (kg)</Label>
-                    <Input
-                      type="number"
-                      className="mt-1 rounded-xl border-[#b1b3a9] bg-white"
-                      placeholder="kg"
-                      value={form.weightKg}
-                      onChange={(e) => setForm({ ...form, weightKg: e.target.value })}
-                    />
+                    <Input type="number" className="mt-1 rounded-xl border-[#b1b3a9] bg-white" placeholder="kg"
+                      value={form.weightKg} onChange={(e) => setForm({ ...form, weightKg: e.target.value })} />
                   </div>
                   <div>
                     <Label className="[font-family:'Manrope',Helvetica] text-xs font-bold text-[#5d6058]">Height (cm)</Label>
-                    <Input
-                      type="number"
-                      className="mt-1 rounded-xl border-[#b1b3a9] bg-white"
-                      placeholder="cm"
-                      value={form.heightCm}
-                      onChange={(e) => setForm({ ...form, heightCm: e.target.value })}
-                    />
+                    <Input type="number" className="mt-1 rounded-xl border-[#b1b3a9] bg-white" placeholder="cm"
+                      value={form.heightCm} onChange={(e) => setForm({ ...form, heightCm: e.target.value })} />
                   </div>
                 </div>
                 {bmi && (
-                  <div className="mt-4 rounded-2xl bg-[#9df197] px-5 py-3 inline-flex items-center gap-2">
-                    <span className="[font-family:'Manrope',Helvetica] text-xs font-bold text-[#005c15]">BMI</span>
-                    <span className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-lg font-extrabold text-[#1c6d25]">{bmi}</span>
+                  <div className="mt-4 flex items-center gap-3">
+                    <div className="rounded-2xl bg-[#9df197] px-5 py-3 inline-flex items-center gap-2">
+                      <span className="[font-family:'Manrope',Helvetica] text-xs font-bold text-[#005c15]">BMI</span>
+                      <span className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-lg font-extrabold text-[#1c6d25]">{bmi}</span>
+                    </div>
+                    <span className="[font-family:'Manrope',Helvetica] text-sm font-bold text-[#5d6058]">{bmiLabel}</span>
                   </div>
                 )}
               </CardContent>
@@ -195,9 +195,7 @@ export function ProfilePage() {
             {/* Diet Type */}
             <Card className="rounded-[48px] border-0 bg-[#f4f4ec] shadow-none">
               <CardContent className="p-8">
-                <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-xl font-bold text-[#31332c] mb-5">
-                  Diet Type
-                </h3>
+                <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-xl font-bold text-[#31332c] mb-5">Diet Type</h3>
                 <div className="flex flex-wrap gap-3">
                   {dietTypes.map((type) => (
                     <button
@@ -219,21 +217,20 @@ export function ProfilePage() {
             {/* Health Goals */}
             <Card className="rounded-[48px] border-0 bg-[#f4f4ec] shadow-none">
               <CardContent className="p-8">
-                <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-xl font-bold text-[#31332c] mb-5">
-                  Health Goals
-                </h3>
+                <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-xl font-bold text-[#31332c] mb-5">Health Goals</h3>
                 <div className="flex flex-wrap gap-3">
-                  {goalOptions.map((goal) => (
+                  {goalOptions.map((g) => (
                     <button
-                      key={goal}
-                      onClick={() => toggleGoal(goal)}
-                      className={`rounded-full px-4 py-2 text-sm font-bold [font-family:'Manrope',Helvetica] transition-colors ${
-                        form.healthGoals.includes(goal)
+                      key={g.value}
+                      onClick={() => toggleGoal(g.value)}
+                      className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold [font-family:'Manrope',Helvetica] transition-colors ${
+                        form.healthGoals.includes(g.value)
                           ? "bg-[#9df197] text-[#005c15]"
                           : "bg-white text-[#5d6058] border border-[#b1b3a91a] hover:bg-[#f0fff0]"
                       }`}
                     >
-                      {goal}
+                      <span>{g.emoji}</span>
+                      <span>{g.value}</span>
                     </button>
                   ))}
                 </div>
@@ -243,11 +240,12 @@ export function ProfilePage() {
             {/* Allergies */}
             <Card className="rounded-[48px] border-0 bg-[#f4f4ec] shadow-none">
               <CardContent className="p-8">
-                <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-xl font-bold text-[#31332c] mb-5">
-                  Food Allergies & Intolerances
-                </h3>
-                <div className="flex flex-wrap gap-3">
-                  {commonAllergies.map((allergy) => (
+                <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-xl font-bold text-[#31332c] mb-2">Food Allergies & Intolerances</h3>
+                <p className="[font-family:'Manrope',Helvetica] text-xs text-[#5d6058] mb-5">AI will never suggest foods containing these ingredients.</p>
+
+                {/* Preset allergies */}
+                <div className="flex flex-wrap gap-3 mb-5">
+                  {presetAllergies.map((allergy) => (
                     <button
                       key={allergy}
                       onClick={() => toggleAllergy(allergy)}
@@ -261,15 +259,55 @@ export function ProfilePage() {
                     </button>
                   ))}
                 </div>
+
+                {/* Custom allergy input */}
+                <div className="flex flex-col gap-2">
+                  <Label className="[font-family:'Manrope',Helvetica] text-xs font-bold text-[#5d6058]">Add a custom allergy (e.g. Mustard, Fish, Sesame)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Type and press Enter or Add..."
+                      value={customAllergy}
+                      onChange={(e) => setCustomAllergy(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && addCustomAllergy()}
+                      className="rounded-xl border-[#b1b3a9] bg-white flex-1"
+                    />
+                    <Button
+                      type="button"
+                      onClick={addCustomAllergy}
+                      className="rounded-xl bg-[#aa371c] text-white font-bold [font-family:'Manrope',Helvetica] hover:bg-[#8f2d17] px-4"
+                    >
+                      Add
+                    </Button>
+                  </div>
+                </div>
+
+                {/* All selected (preset + custom) */}
+                {form.allergies.length > 0 && (
+                  <div className="mt-4 flex flex-col gap-2">
+                    <p className="[font-family:'Manrope',Helvetica] text-xs font-bold text-[#5d6058]">Your allergies:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {form.allergies.map((a) => (
+                        <span
+                          key={a}
+                          className="flex items-center gap-1.5 rounded-full bg-[#aa371c] text-white px-3 py-1 text-xs font-bold [font-family:'Manrope',Helvetica]"
+                        >
+                          {a}
+                          <button type="button" onClick={() => removeAllergy(a)} className="hover:opacity-70 text-sm leading-none">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* Calorie Target */}
+            {/* Daily Targets */}
             <Card className="rounded-[48px] border-0 bg-[#f4f4ec] shadow-none">
               <CardContent className="p-8">
-                <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-xl font-bold text-[#31332c] mb-5">
-                  Daily Targets
-                </h3>
+                <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-xl font-bold text-[#31332c] mb-2">Daily Targets</h3>
+                <p className="[font-family:'Manrope',Helvetica] text-xs text-[#5d6058] mb-5">
+                  These are auto-calculated during onboarding based on your body stats & goals. You can fine-tune them here.
+                </p>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="[font-family:'Manrope',Helvetica] text-xs font-bold text-[#5d6058]">Daily Calorie Target (kcal)</Label>
@@ -306,9 +344,7 @@ export function ProfilePage() {
           <aside className="flex flex-col gap-6 lg:col-span-4">
             <Card className="rounded-[48px] border-0 bg-[#ffdeac] shadow-none">
               <CardContent className="p-6">
-                <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-base font-bold text-[#6e4b00] mb-3">
-                  Your Summary
-                </h3>
+                <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-base font-bold text-[#6e4b00] mb-3">Your Summary</h3>
                 <div className="flex flex-col gap-3 text-sm [font-family:'Manrope',Helvetica]">
                   <div className="flex justify-between">
                     <span className="text-[#7f5700]">Diet Type</span>
@@ -325,7 +361,13 @@ export function ProfilePage() {
                   {bmi && (
                     <div className="flex justify-between">
                       <span className="text-[#7f5700]">BMI</span>
-                      <span className="font-bold text-[#6e4b00]">{bmi}</span>
+                      <span className="font-bold text-[#6e4b00]">{bmi} ({bmiLabel})</span>
+                    </div>
+                  )}
+                  {form.allergies.length > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-[#7f5700]">Allergies</span>
+                      <span className="font-bold text-[#6e4b00] text-right max-w-[120px]">{form.allergies.join(", ")}</span>
                     </div>
                   )}
                 </div>
@@ -343,11 +385,9 @@ export function ProfilePage() {
 
             <Card className="rounded-[48px] border-0 bg-[#e8e9df] shadow-none">
               <CardContent className="p-6">
-                <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-base font-bold text-[#31332c] mb-3">
-                  Why this matters
-                </h3>
+                <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-base font-bold text-[#31332c] mb-3">Why this matters</h3>
                 <p className="[font-family:'Manrope',Helvetica] text-sm text-[#5d6058] leading-relaxed">
-                  NutriSense uses your profile to personalise AI meal plans, expiry alerts, and nutrition insights specifically for your diet type and health goals.
+                  NutriSense uses your profile to personalise AI meal plans, expiry alerts, and nutrition insights — including strictly avoiding your allergens in all suggestions.
                 </p>
               </CardContent>
             </Card>
