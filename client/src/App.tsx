@@ -48,6 +48,9 @@ function Router() {
       <Route path="/insights">
         {isAuthenticated ? <NutrisenseDigital activePage="insights" /> : <LandingPage />}
       </Route>
+      <Route path="/chat">
+        {isAuthenticated ? <NutrisenseDigital activePage="chat" /> : <LandingPage />}
+      </Route>
       <Route path="/profile">
         {isAuthenticated ? <NutrisenseDigital activePage="profile" /> : <LandingPage />}
       </Route>

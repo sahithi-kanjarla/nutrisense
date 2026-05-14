@@ -8,6 +8,7 @@ const primaryNavItems = [
   { label: "Log Meal", href: "/log-meal", icon: "🍽️" },
   { label: "Pantry", href: "/", icon: "🥗" },
   { label: "Insights", href: "/insights", icon: "📈" },
+  { label: "AI Chat", href: "/chat", icon: "💬" },
   { label: "Profile", href: "/profile", icon: "👤" },
 ];
 

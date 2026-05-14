@@ -213,16 +213,47 @@ export function LogMealPage() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.name.trim()) return toast({ title: "Please enter a meal name", variant: "destructive" });
+    
+    let mealNutrition = { ...form.nutrition };
+    
+    // Auto-calculate if user forgot to calculate and left calories at 0
+    if (!form.nutritionCalculated && mealNutrition.calories === 0) {
+      setCalcLoading(true);
+      try {
+        const res = await fetch("/api/ai/calculate-nutrition", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ foodName: form.name, quantity: form.quantity, unit: form.unit }),
+        });
+        const data = await res.json();
+        mealNutrition = {
+          calories: data.calories || 0,
+          protein: data.protein || 0,
+          carbs: data.carbs || 0,
+          fats: data.fats || 0,
+          fiber: data.fiber || 0,
+          iron: data.iron || 0,
+        };
+        setForm(f => ({ ...f, nutrition: mealNutrition, nutritionCalculated: true }));
+        toast({ title: "Nutrition auto-calculated!" });
+      } catch {
+        toast({ title: "Could not auto-calculate", description: "Saving with 0 macros.", variant: "destructive" });
+      } finally {
+        setCalcLoading(false);
+      }
+    }
+
     addMeal.mutate({
       name: form.name,
       mealType: form.mealType,
-      calories: form.nutrition.calories || undefined,
-      protein: form.nutrition.protein || undefined,
-      carbs: form.nutrition.carbs || undefined,
-      fats: form.nutrition.fats || undefined,
-      fiber: form.nutrition.fiber || undefined,
+      calories: mealNutrition.calories || 0,
+      protein: String(mealNutrition.protein || 0),
+      carbs: String(mealNutrition.carbs || 0),
+      fats: String(mealNutrition.fats || 0),
+      fiber: String(mealNutrition.fiber || 0),
     });
   };
 

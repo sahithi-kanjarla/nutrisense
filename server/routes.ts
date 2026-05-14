@@ -32,6 +32,7 @@ function buildProfileContext(profile: any): string {
   if (profile.healthGoals?.length) parts.push(`Goals: ${profile.healthGoals.join(", ")}`);
   if (profile.allergies?.length) parts.push(`ALLERGIES (NEVER suggest): ${profile.allergies.join(", ")}`);
   if (profile.dailyCalorieTarget) parts.push(`Daily calorie target: ${profile.dailyCalorieTarget} kcal`);
+  if (profile.aiPreferences) parts.push(`USER'S CUSTOM AI PREFERENCES: ${profile.aiPreferences}`);
   return parts.join(" | ");
 }
 

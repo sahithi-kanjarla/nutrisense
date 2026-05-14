@@ -38,6 +38,7 @@ export function ProfilePage() {
     waterIntakeLitres: "2.5",
     healthGoals: [] as string[],
     allergies: [] as string[],
+    aiPreferences: "",
   });
   const [customAllergy, setCustomAllergy] = useState("");
 
@@ -52,6 +53,7 @@ export function ProfilePage() {
         waterIntakeLitres: String(profile.waterIntakeLitres || "2.5"),
         healthGoals: profile.healthGoals || [],
         allergies: profile.allergies || [],
+        aiPreferences: profile.aiPreferences || "",
       });
     }
   }, [profile]);
@@ -71,6 +73,7 @@ export function ProfilePage() {
           waterIntakeLitres: form.waterIntakeLitres || undefined,
           healthGoals: form.healthGoals,
           allergies: form.allergies,
+          aiPreferences: form.aiPreferences || undefined,
         }),
       });
       if (!res.ok) throw new Error("Failed to save");
@@ -332,6 +335,24 @@ export function ProfilePage() {
               </CardContent>
             </Card>
 
+            {/* Custom AI Preferences */}
+            <Card className="rounded-[48px] border-0 bg-[#eaffe2] shadow-none">
+              <CardContent className="p-8">
+                <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-xl font-bold text-[#1c6d25] mb-2">Custom AI Preferences</h3>
+                <p className="[font-family:'Manrope',Helvetica] text-xs text-[#5d6058] mb-5">
+                  Tell the AI how you like your food! For example: "I love Western culture food, but make it healthy" or "Keep recipes under 15 mins".
+                </p>
+                <div className="flex flex-col gap-2">
+                  <textarea
+                    placeholder="e.g. I prefer mildly spiced food and love mixing Indian and Italian cuisines..."
+                    value={form.aiPreferences}
+                    onChange={(e) => setForm({ ...form, aiPreferences: e.target.value })}
+                    className="rounded-2xl border border-[#b1b3a9] bg-white w-full min-h-[100px] p-4 text-sm [font-family:'Manrope',Helvetica] focus:outline-none focus:ring-2 focus:ring-[#1c6d25]"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
             <Button
               onClick={() => saveProfile.mutate()}
               disabled={saveProfile.isPending}
@@ -380,6 +401,20 @@ export function ProfilePage() {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[48px] border-0 bg-[#1c6d25] shadow-none">
+              <CardContent className="p-6 flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-[#9df197] text-base">✨</span>
+                  <h3 className="[font-family:'Plus_Jakarta_Sans',Helvetica] text-base font-bold text-[#eaffe2]">AI Strategy</h3>
+                </div>
+                <p className="[font-family:'Manrope',Helvetica] text-sm text-[#9df197cc] leading-relaxed">
+                  Based on your {form.healthGoals.length ? form.healthGoals.join(" and ") : "General Wellness"} goal, aim for consistent meals rich in {form.dietType === "Vegetarian" || form.dietType === "Vegan" ? "plant-based protein (dals, tofu, paneer)" : "lean protein"}. 
+                  <br/><br/>
+                  The AI Chatbot is ready to help you hit {form.dailyCalorieTarget} kcal/day using your pantry!
+                </p>
               </CardContent>
             </Card>
 

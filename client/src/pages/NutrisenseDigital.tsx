@@ -4,9 +4,10 @@ import { DashboardPage } from "./DashboardPage";
 import { LogMealPage } from "./LogMealPage";
 import { InsightsPage } from "./InsightsPage";
 import { ProfilePage } from "./ProfilePage";
+import { ChatPage } from "./ChatPage";
 
 interface Props {
-  activePage?: "pantry" | "dashboard" | "log-meal" | "insights" | "profile";
+  activePage?: "pantry" | "dashboard" | "log-meal" | "insights" | "profile" | "chat";
 }
 
 export const NutrisenseDigital = ({ activePage = "pantry" }: Props): JSX.Element => {
@@ -21,6 +22,7 @@ export const NutrisenseDigital = ({ activePage = "pantry" }: Props): JSX.Element
           {activePage === "dashboard" && <DashboardPage />}
           {activePage === "log-meal" && <LogMealPage />}
           {activePage === "insights" && <InsightsPage />}
+          {activePage === "chat" && <ChatPage />}
           {activePage === "profile" && <ProfilePage />}
         </section>
       </div>

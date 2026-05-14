@@ -117,6 +117,7 @@ export const healthProfiles = pgTable("health_profiles", {
   healthGoals: text("health_goals").array().default(sql`'{}'::text[]`),
   dailyCalorieTarget: integer("daily_calorie_target").default(2000),
   waterIntakeLitres: numeric("water_intake_litres").default("2.5"),
+  aiPreferences: text("ai_preferences"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
