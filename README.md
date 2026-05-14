@@ -7,6 +7,7 @@ NutriSense is a full-stack digital pantry and nutrition application designed to 
 - **Digital Pantry**: Keep track of food items, ingredients, set expiration dates, and get notifications for expiring items.
 - **Meal Logging**: Log daily meals with automated nutritional macro calculation (calories, protein, carbs, fats, fiber).
 - **Personalized Insights**: Track your daily progress towards health goals with beautiful, interactive visualizations.
+- **Proactive AI Diet Balancing**: If you are missing your daily macros (e.g., you need more protein), the AI will intelligently scan your digital pantry and suggest items you already have at home (like Paneer or Lentils) to help you complete your goal.
 - **AI Chat Assistant**: A dedicated AI chatbot that understands your specific pantry inventory, allergies, and dietary preferences to suggest personalized recipes.
 - **Health Profiles**: Store custom dietary preferences, water intake goals, and allergy constraints to guide all AI suggestions.
 

@@ -202,6 +202,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 USER PROFILE: ${profileCtx || "Not set up yet"}
 CURRENT PANTRY: ${pantryList}
 - Help manage their pantry, suggest recipes using their actual pantry items
+- Proactively suggest how to balance their diet based on their goals. For example, if they need more protein, check their CURRENT PANTRY for items like paneer or lentils and recommend eating them to complete their daily goal.
 - ${profile?.dietType ? `Follow ${profile.dietType} diet strictly` : "Default to vegetarian suggestions"}
 - STRICTLY avoid allergens: ${profile?.allergies?.length ? profile.allergies.join(", ") : "none listed"}
 - Keep calories near ${profile?.dailyCalorieTarget || 2000} kcal/day target
